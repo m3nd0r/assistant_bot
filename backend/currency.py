@@ -36,6 +36,6 @@ def exchange_advice_message(data: dict) -> str:
             try_rub = v.get("info")["rate"]
     res_rub = usd_rub/try_rub
 
-    message = ["Сейчас выгоднее выводить через RUB."] if res_rub >= usd_try else ["Сейчас выгоднее выводить через USD"]
+    message = ["Сейчас выгоднее выводить через RUB 🇷🇺\n"] if res_rub >= usd_try else ["Сейчас выгоднее выводить через USD 🇺🇸\n"]
     message.append(f"100$ через RUB: {round(res_rub, 2)}\n100$ через USD: {round(usd_try, 2)}")
     return '\n'.join(message)

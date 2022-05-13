@@ -1,4 +1,8 @@
-from currency import get_currency_rate, currency_exchange_message, exchange_advice_message
+from currency import (
+    get_currency_rate,
+    currency_exchange_message,
+    exchange_advice_message,
+)
 from fastapi import FastAPI
 
 app = FastAPI()
