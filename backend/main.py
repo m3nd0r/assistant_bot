@@ -4,8 +4,15 @@ from currency import (
     exchange_advice_message,
 )
 from fastapi import FastAPI
+from extensions import redis_connect
+
 
 app = FastAPI()
+
+
+@app.on_event("startup")
+async def startup_event():
+    redis_connect()
 
 
 @app.get("/")

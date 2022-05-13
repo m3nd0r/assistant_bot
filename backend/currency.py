@@ -11,7 +11,7 @@ def get_currency_rate(currency_pairs: list) -> dict:
         currency = pair.split("/")[1]
         url = f"https://api.exchangerate.host/convert?from={base}&to={currency}&amount=100&places=2"
         response = requests.get(url)
-        res[pair] = (response.json())
+        res[pair] = response.json()
     return res
 
 
@@ -23,7 +23,7 @@ def currency_exchange_message(data: dict) -> str:
     message = []
     for pair, responsse_json in data.items():
         message.append(f'{pair}: {responsse_json.get("info")["rate"]}')
-    return '\n'.join(message)
+    return "\n".join(message)
 
 
 def exchange_advice_message(data: dict) -> str:
@@ -34,8 +34,14 @@ def exchange_advice_message(data: dict) -> str:
             usd_rub = v.get("result") - 300
         if k == "TRY/RUB":
             try_rub = v.get("info")["rate"]
-    res_rub = usd_rub/try_rub
+    res_rub = usd_rub / try_rub
 
-    message = ["Сейчас выгоднее выводить через RUB 🇷🇺\n"] if res_rub >= usd_try else ["Сейчас выгоднее выводить через USD 🇺🇸\n"]
-    message.append(f"100$ через RUB: {round(res_rub, 2)}\n100$ через USD: {round(usd_try, 2)}")
-    return '\n'.join(message)
+    message = (
+        ["Сейчас выгоднее выводить через RUB 🇷🇺\n"]
+        if res_rub >= usd_try
+        else ["Сейчас выгоднее выводить через USD 🇺🇸\n"]
+    )
+    message.append(
+        f"100$ через RUB: {round(res_rub, 2)}\n100$ через USD: {round(usd_try, 2)}"
+    )
+    return "\n".join(message)
