@@ -11,6 +11,20 @@ logging.basicConfig(
 TOKEN = "971733751:AAFiaQbALIa645dIUulXuGeBu44Q_KsYCAI"
 
 
+def get_user_data(update: Update, text_only=False):
+    # Collect user data and prepare `dict` with it
+    params = {
+        'user_id': update.message.from_user.id,
+        'username': update.message.from_user.username,
+        'message_text': update.message.text
+    }
+    if text_only:
+        params = {
+            'message_text': update.message.text
+        }
+    return params
+
+
 async def start(update: Update, context: CallbackContext.DEFAULT_TYPE):
     await context.bot.send_message(
         chat_id=update.effective_chat.id, text="I'm a bot, please talk to me!"
@@ -18,7 +32,8 @@ async def start(update: Update, context: CallbackContext.DEFAULT_TYPE):
 
 
 async def currency(update: Update, context: CallbackContext.DEFAULT_TYPE):
-    response = requests.get(url="http://127.0.0.1:8000/currency").json()
+    params = get_user_data(update)
+    response = requests.get(url=f"http://127.0.0.1:8000/currency/", params=params).json()
     await context.bot.send_message(chat_id=update.effective_chat.id, text=f"{response}")
 
 

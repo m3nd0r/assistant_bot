@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Float
 from sqlalchemy.orm import relationship
 
 from .database import Base
@@ -8,8 +8,8 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    telegram_id = Column(Integer, unique=True, index=True)
-    is_active = Column(Boolean, default=True)
+    telegram_id = Column(Integer, index=True)
+    username = Column(String, index=True)
 
     messages = relationship("Message", back_populates="user")
 
@@ -30,5 +30,5 @@ class CurrencyPair(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     date = Column(DateTime)
-    pair = Column(String, unique=True, index=True)
-    exchange_rate = Column(Integer, unique=True, index=True)
+    pair = Column(String, index=True)
+    exchange_rate = Column(Float, index=True)
