@@ -1,4 +1,27 @@
 import requests
+from datetime import datetime
+from sqlalchemy.orm import Session
+
+from . import models
+
+
+#TODO: Проверять дату последнего сохранения, если меньше 3 часов - возвращать инфу из БД
+def save_currency_rates(db: Session, currency_pairs: list):
+    # Updates currency exchange rates and saves them to the db
+    for pair in currency_pairs:
+        base = pair.split("/")[0]
+        currency = pair.split("/")[1]
+        url = f"https://api.exchangerate.host/convert?from={base}&to={currency}&amount=100&places=2"
+        response = requests.get(url)
+        db.add(
+            models.CurrencyPair(
+                date=datetime.now(),
+                pair=pair,
+                exchange_rate=response.json().get("info")["rate"],
+            )
+        )
+    print('Ready to commit!')
+    db.commit()
 
 
 def get_currency_rate(currency_pairs: list) -> dict:
@@ -21,8 +44,8 @@ def currency_exchange_message(data: dict) -> str:
     "currency_pair": "exchange rate"
     """
     message = []
-    for pair, responsse_json in data.items():
-        message.append(f'{pair}: {responsse_json.get("info")["rate"]}')
+    for pair, response_json in data.items():
+        message.append(f'{pair}: {response_json.get("info")["rate"]}')
     return "\n".join(message)
 
 
