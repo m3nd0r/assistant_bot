@@ -1,10 +1,10 @@
-from currency import (
+from .currency import (
     get_currency_rate,
     currency_exchange_message,
     exchange_advice_message,
 )
 from fastapi import FastAPI
-from extensions import redis_connect
+from .extensions import redis_connect
 
 
 app = FastAPI()
