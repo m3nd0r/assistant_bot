@@ -1,7 +1,8 @@
 from .currency import (
     save_currency_rates,
-    currency_exchange_message,
     exchange_advice_message,
+    get_currency_rate,
+    currency_exchange_message
 )
 from fastapi import Depends, FastAPI, HTTPException
 from .extensions import redis_connect
@@ -36,7 +37,8 @@ async def root():
 @app.get("/currency/")
 async def currency(user_id: int, username: str, message_text: str, db: Session = Depends(get_db)): # TODO: указать response_model - объект нового класса, который будет формировать сообщения
     save_currency_rates(db, currency_pairs=["USD/RUB", "USD/TRY", "TRY/RUB"])
-    return 'Done'
+    data = get_currency_rate(currency_pairs=["USD/RUB", "USD/TRY", "TRY/RUB"])
+    return currency_exchange_message(data)
 
 
 @app.get("/need_tl")
