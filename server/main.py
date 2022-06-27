@@ -1,15 +1,16 @@
+from datetime import datetime
 from .currency import (
     save_currency_rates,
     exchange_advice_message,
     get_currency_rate,
-    currency_exchange_message
+    currency_exchange_message,
 )
 from fastapi import Depends, FastAPI, HTTPException
 from .extensions import redis_connect
 from .database import SessionLocal, engine
 from sqlalchemy.orm import Session
-from . import models
-
+from . import models, training, schemas
+from .utils import check_user_exists
 
 models.Base.metadata.create_all(bind=engine)
 app = FastAPI()
@@ -29,13 +30,34 @@ async def startup_event():
     redis_connect()
 
 
-@app.get("/")
-async def root():
-    return {"message": "Hello World"}
+@app.get("/start")
+async def root(
+    user_id: int, username: str, message_text: str, db: Session = Depends(get_db)
+):
+    if check_user_exists(db, user_id):
+        return f"You are already registered. How can I help you?"
+    new_user = models.User(
+        telegram_id=user_id, username=username, register_date=datetime.today()
+    )
+    db.add(new_user)
+    db.flush()
+    db.add(
+        models.Message(
+            text=message_text,
+            author_id=new_user.id,
+        )
+    )
+    db.commit()
+    return f"Привет!"
 
 
 @app.get("/currency/")
-async def currency(user_id: int, username: str, message_text: str, db: Session = Depends(get_db)): # TODO: указать response_model - объект нового класса, который будет формировать сообщения
+async def currency(
+    db: Session = Depends(get_db),
+):  # TODO: указать response_model - объект нового класса, который будет формировать сообщения
+    """
+    Посчитать и сохранить в бд курс для заданных валютных пар
+    """
     save_currency_rates(db, currency_pairs=["USD/RUB", "USD/TRY", "TRY/RUB"])
     data = get_currency_rate(currency_pairs=["USD/RUB", "USD/TRY", "TRY/RUB"])
     return currency_exchange_message(data)
@@ -50,3 +72,31 @@ async def currency():
     """
     data = get_currency_rate(currency_pairs=["USD/RUB", "USD/TRY", "TRY/RUB"])
     return exchange_advice_message(data)
+
+
+@app.post("/create_exercise")
+async def create_exercise(
+    user_id: int,
+    name: str,
+    reps: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Создаёт новое упражнение и сохраняет в БД название и количество повторений
+    """
+    training.create_exercise(
+        db, exercise=schemas.ExerciseBase(name=name, reps=reps), telegram_id=user_id
+    )
+    return f"Установил название упражнения: '{name.title()}' и количество повторений в день - {reps}"
+
+
+@app.get("/get_exercises_list")
+async def get_exercises_list(
+    user_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Возвращает список упражнений пользователя
+    """
+    exercises_list = training.get_exercises_list(db, user_id=user_id)
+    return training.message_exerises_list(exercises_list)

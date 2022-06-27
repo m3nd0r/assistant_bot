@@ -5,7 +5,6 @@ from sqlalchemy.orm import Session
 from . import models
 
 
-#TODO: Проверять дату последнего сохранения, если меньше 3 часов - возвращать инфу из БД
 def save_currency_rates(db: Session, currency_pairs: list):
     # Updates currency exchange rates and saves them to the db
     for pair in currency_pairs:
@@ -20,7 +19,6 @@ def save_currency_rates(db: Session, currency_pairs: list):
                 exchange_rate=response.json().get("info")["rate"],
             )
         )
-    print('Ready to commit!')
     db.commit()
 
 

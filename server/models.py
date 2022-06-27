@@ -10,8 +10,10 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     telegram_id = Column(Integer, index=True)
     username = Column(String, index=True)
+    register_date = Column(DateTime, index=True)
 
-    messages = relationship("Message", back_populates="user")
+    messages = relationship("Message", backref="user")
+    exerecises = relationship("Exercise", backref="user")
 
 
 class Message(Base):
@@ -22,8 +24,6 @@ class Message(Base):
     text = Column(String, index=True)
     author_id = Column(Integer, ForeignKey("users.id"))
 
-    user = relationship("User", back_populates="messages")
-
 
 class CurrencyPair(Base):
     __tablename__ = "currency_pairs"
@@ -32,3 +32,14 @@ class CurrencyPair(Base):
     date = Column(DateTime)
     pair = Column(String, index=True)
     exchange_rate = Column(Float, index=True)
+
+
+class Exercise(Base):
+    __tablename__ = "excercises"
+
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(DateTime)
+    name = Column(String, index=True)
+    reps = Column(Integer, index=True)
+
+    user_id = Column(Integer, ForeignKey("users.id"))
