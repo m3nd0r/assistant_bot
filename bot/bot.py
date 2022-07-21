@@ -42,7 +42,11 @@ async def currency(update: Update, context: CallbackContext.DEFAULT_TYPE):
 
 
 async def need_tl(update: Update, context: CallbackContext.DEFAULT_TYPE):
-    response = requests.get(url="http://127.0.0.1:8000/need_tl").json()
+    try:
+        params = {"upwork_exchange_rate": context.args[0]}
+    except IndexError:
+        params = {"upwork_exchange_rate": None}
+    response = requests.get(url="http://127.0.0.1:8000/need_tl", params=params).json()
     await context.bot.send_message(chat_id=update.effective_chat.id, text=f"{response}")
 
 

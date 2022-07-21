@@ -64,13 +64,18 @@ async def currency(
 
 
 @app.get("/need_tl")
-async def currency():
+async def currency(
+    upwork_exchange_rate: float = None,
+):
     """
     Считает, как выгоднее получить лиры - через рубли или через доллары на примере 100$
     100$ в лирах = 100* (15,31 -1) = 1431 tl
     100$ в рубли -> в лиры (66,76 - 3)*100/4.36=1462.12
     """
-    data = get_currency_rate(currency_pairs=["USD/RUB", "USD/TRY", "TRY/RUB"])
+    data = get_currency_rate(
+        currency_pairs=["USD/RUB", "USD/TRY", "TRY/RUB"],
+        upwork_exchange_rate=upwork_exchange_rate,
+    )
     return exchange_advice_message(data)
 
 
