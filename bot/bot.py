@@ -1,26 +1,71 @@
 import logging
 import os
+from typing import Union, List
+
 import requests
 from dotenv import load_dotenv
-
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CallbackContext, CommandHandler
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import (
+    ApplicationBuilder,
+    CallbackContext,
+    CommandHandler,
+    CallbackQueryHandler,
+    ConversationHandler,
+    MessageHandler,
+    filters,
+)
 
 load_dotenv()
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
+logger = logging.getLogger(__name__)
 
 TOKEN = os.environ.get("TOKEN")
 
+CHOOSE_EXERCISE, SET_VALUE = range(2)
+
+
+def build_keyboard(
+    n_cols: int = 2,
+    header_buttons: Union[InlineKeyboardButton, List[InlineKeyboardButton]] = None,
+    footer_buttons: Union[InlineKeyboardButton, List[InlineKeyboardButton]] = None,
+    params: dict = None,
+) -> List[List[InlineKeyboardButton]]:
+    """
+    Собирает клавиатуру со всеми доступными упражнениями для конкретного пользователя
+    """
+    response = requests.get(
+        url="http://127.0.0.1:8000/get_all_exercises", params=params
+    ).json()
+    buttons: List[InlineKeyboardButton] = []
+    for button in response:
+        buttons.append(
+            InlineKeyboardButton(button, callback_data=f"{button};step1"),
+        )
+
+    keyboard = [buttons[i : i + n_cols] for i in range(0, len(buttons), n_cols)]
+    if header_buttons:
+        keyboard.insert(
+            0, header_buttons if isinstance(header_buttons, list) else [header_buttons]
+        )
+    if footer_buttons:
+        keyboard.append(
+            footer_buttons if isinstance(footer_buttons, list) else [footer_buttons]
+        )
+    return keyboard
+
 
 def get_user_data(update: Update, text_only=False):
-    # Collect user data and prepare `dict` with it
+    """
+    Базовые данные пользователя.
+    Скорее всего, можно просто засунуть в context.user_data при первом вызове и доставать оттуда по необходимости.
+    """
     params = {
-        "user_id": update.message.from_user.id,
-        "username": update.message.from_user.username,
-        "message_text": update.message.text,
+        "user_id": update.effective_chat.id,
+        "username": update.effective_chat.username,
+        "message_text": update.effective_message.text,
     }
     if text_only:
         params = {"message_text": update.message.text}
@@ -51,26 +96,121 @@ async def need_tl(update: Update, context: CallbackContext.DEFAULT_TYPE):
 
 
 async def create_exercise(update: Update, context: CallbackContext.DEFAULT_TYPE):
+    """
+    Добавить новое упражнение
+    """
     params = get_user_data(update)
-    # TODO: проверки! и правильно парсить текст сообщения
+    try:
+        params.update(
+            {
+                "name": context.args[0],
+                "reps_per_day_target": context.args[1],
+            }
+        )
+        response = requests.post(
+            url="http://127.0.0.1:8000/create_exercise/", params=params
+        ).json()
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=f"{response}")
+    except IndexError:
+        error_message = (
+        f'Не удалось создать упражнение.\nПравильная команда:\n\n<b>/create_exercise название_упражнения количество_повторений_в_день</b>'
+        f'\nНапример:\n\n<b>/create_exercise приседания 10</b>'
+        )
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=f"{error_message}", parse_mode="html",)
+
+
+
+async def update_exercise(update: Update, context: CallbackContext.DEFAULT_TYPE):
+    """
+    Отправить запрос на обновление данных об упражнении
+    Запускает ConversationHandler
+    """
+    params = get_user_data(update)
     params.update(
-        {
-            "name": context.args[0],
-            "reps": context.args[1],
-        }
+        {"get_list": True}
+    )  # Чтобы получить список упражнений, вместо словаря
+    reply_markup = InlineKeyboardMarkup(build_keyboard(n_cols=2, params=params))
+    await update.message.reply_text(
+        text="Какое упражнение нужно обновить?", reply_markup=reply_markup
     )
-    response = requests.post(
-        url="http://127.0.0.1:8000/create_exercise/", params=params
-    ).json()
-    await context.bot.send_message(chat_id=update.effective_chat.id, text=f"{response}")
+    return CHOOSE_EXERCISE
 
 
-async def get_exercises_list(update: Update, context: CallbackContext.DEFAULT_TYPE):
+async def select_exercise(update: Update, context: CallbackContext.DEFAULT_TYPE):
+    """
+    Запоминает название выбранного упражнения и переходит к следующему шагу.
+    """
+    query = update.callback_query
+    await query.answer()
+
+    data = query.data
+    logger.info(f"data, {data}")
+    exercise_name = data.split(";")[0]
+    step_number = data.split(";")[1].strip()
+
+    context.user_data["exercise_name"] = exercise_name  # Сохраняем название упражнения
+
+    if step_number == "step1":
+        await query.edit_message_text(
+            text=f"Сколько (число)?",
+        )
+    return SET_VALUE
+
+
+async def set_exercise_value(update: Update, context: CallbackContext.DEFAULT_TYPE):
+    """
+    Обновляет данные об упражнении в БД. Ждёт от пользователя целое число.
+    """
+    try:
+        params = get_user_data(update)
+        exercise_name = context.user_data["exercise_name"]
+        value = int(update.effective_message.text)
+        params.update(
+            {
+                "name": exercise_name,
+                "reps_last_try": value,
+            }
+        )
+        response = requests.post(
+            url="http://127.0.0.1:8000/update_exercise", params=params
+        ).json()
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=response.get("message"),
+            parse_mode="MarkdownV2",
+        )
+    except ValueError as e:
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Некорректное значение. Введите число.",
+        )
+        return SET_VALUE
+    return ConversationHandler.END
+
+
+async def end(update: Update, context: CallbackContext.DEFAULT_TYPE) -> int:
+    """
+    Принудительный выход из ConversationHandler'a
+    """
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text(text="Пока-пока!")
+    return ConversationHandler.END
+
+
+async def get_all_exercises(update: Update, context: CallbackContext.DEFAULT_TYPE):
+    """
+    Получить список всех доступных пользователю упражнений
+    """
     params = get_user_data(update)
     response = requests.get(
-        url="http://127.0.0.1:8000/get_exercises_list", params=params
+        url="http://127.0.0.1:8000/get_all_exercises", params=params
     ).json()
-    await context.bot.send_message(chat_id=update.effective_chat.id, text=f"{response}")
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=f"{response}",
+        parse_mode="MarkdownV2",
+    )
 
 
 if __name__ == "__main__":
@@ -80,14 +220,25 @@ if __name__ == "__main__":
     currency_handler = CommandHandler("currency", currency)
     need_tl_handler = CommandHandler("need_tl", need_tl)
     create_exercise_handler = CommandHandler("create_exercise", create_exercise)
-    get_exercises_list_handler = CommandHandler(
-        "get_exercises_list", get_exercises_list
-    )
+    get_all_exercises_handler = CommandHandler("get_all_exercises", get_all_exercises)
 
-    application.add_handler(start_handler)
-    application.add_handler(currency_handler)
-    application.add_handler(need_tl_handler)
-    application.add_handler(create_exercise_handler)
-    application.add_handler(get_exercises_list_handler)
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler("update_exercise", update_exercise)],
+        states={
+            CHOOSE_EXERCISE: [CallbackQueryHandler(select_exercise)],
+            SET_VALUE: [MessageHandler(filters.TEXT, set_exercise_value)],
+        },
+        fallbacks=[CommandHandler("end", end)],
+    )
+    application.add_handlers(
+        [
+            start_handler,
+            currency_handler,
+            need_tl_handler,
+            create_exercise_handler,
+            get_all_exercises_handler,
+            conv_handler,
+        ]
+    )
 
     application.run_polling()

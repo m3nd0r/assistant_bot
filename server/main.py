@@ -12,6 +12,8 @@ from sqlalchemy.orm import Session
 from . import models, training, schemas
 from .utils import check_user_exists
 
+# TODO: move different endpoints to separate files.
+
 models.Base.metadata.create_all(bind=engine)
 app = FastAPI()
 
@@ -79,29 +81,60 @@ async def currency(
     return exchange_advice_message(data)
 
 
+@app.get("/get_all_exercises")
+async def get_all_exercises(
+    user_id: int,
+    db: Session = Depends(get_db),
+    get_list: bool = False,
+):
+    """
+    Возвращает полный список упражнений пользователя
+    """
+    exercises = training.get_all_exercises(db, user_id=user_id)
+    if get_list:
+        return sorted([exercise.name for exercise in exercises])
+
+    if exercises:
+        return training.message_all_exerises(exercises)
+    else:
+        return "У вас нет запланированных упражнений"
+
+
 @app.post("/create_exercise")
 async def create_exercise(
     user_id: int,
     name: str,
-    reps: int,
+    reps_per_day_target: int,
     db: Session = Depends(get_db),
 ):
     """
     Создаёт новое упражнение и сохраняет в БД название и количество повторений
     """
     training.create_exercise(
-        db, exercise=schemas.ExerciseBase(name=name, reps=reps), telegram_id=user_id
+        db,
+        exercise=schemas.ExerciseBase(
+            name=name, reps_per_day_target=reps_per_day_target
+        ),
+        telegram_id=user_id,
     )
-    return f"Установил название упражнения: '{name.title()}' и количество повторений в день - {reps}"
+    return f"Установил название упражнения: '{name.title()}' и количество повторений в день - {reps_per_day_target}"
 
 
-@app.get("/get_exercises_list")
-async def get_exercises_list(
+
+@app.post("/update_exercise")
+async def update_exercise(
     user_id: int,
+    name: str,
+    reps_last_try: int = 0,
     db: Session = Depends(get_db),
 ):
     """
-    Возвращает список упражнений пользователя
+    Обновляет название и количество повторений упражнения по названию
     """
-    exercises_list = training.get_exercises_list(db, user_id=user_id)
-    return training.message_exerises_list(exercises_list)
+    exercise = training.get_exercise_by_name(db, name, user_id)
+    updated_exercise = training.update_exercise(
+        db,
+        exercise=exercise,
+        reps_last_try=reps_last_try,
+    )
+    return updated_exercise.prepare_update_exercise_message
