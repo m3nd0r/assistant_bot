@@ -23,13 +23,16 @@ class User(BaseModel):
 
 class ExerciseBase(BaseModel):
     name: str
-    reps: int
+    reps_per_day_target: int
 
 
 class Exercise(ExerciseBase):
     id: int
     user_id: int
-    date: datetime
+    created_date: datetime
+    last_updated_date: datetime
+    reps_per_day_done: int
+    reps_last_try: int
 
     class Config:
         orm_mode = True
