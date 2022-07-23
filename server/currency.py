@@ -54,7 +54,6 @@ def currency_exchange_message(data: dict) -> str:
 def exchange_advice_message(data: dict) -> str:
     usd_rub = data.get("USD/RUB")
     for k, v in data.items():
-        print(f"{k}:{v}")
         if k == "USD/TRY":
             usd_try = v.get("result")
         if k == "USD/RUB" and not isinstance(v, float):
