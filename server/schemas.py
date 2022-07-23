@@ -1,5 +1,6 @@
 from datetime import datetime
 from pydantic import BaseModel
+from typing import List
 
 
 class Message(BaseModel):
@@ -15,7 +16,7 @@ class Message(BaseModel):
 class User(BaseModel):
     id: int
     is_active: bool
-    messages: list[Message] = []
+    messages: List[Message] = []
 
     class Config:
         orm_mode = True
