@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 TOKEN = os.environ.get("TOKEN")
 
-CHOOSE_EXERCISE, SET_VALUE = range(2)
+CHOOSE_EXERCISE, SET_VALUE, REMOVE_EXERCISE, CONFIRM_ACTION = range(4)
 
 
 def build_keyboard(
@@ -32,6 +32,7 @@ def build_keyboard(
     header_buttons: Union[InlineKeyboardButton, List[InlineKeyboardButton]] = None,
     footer_buttons: Union[InlineKeyboardButton, List[InlineKeyboardButton]] = None,
     params: dict = None,
+    action: str = None,
 ) -> List[List[InlineKeyboardButton]]:
     """
     Собирает клавиатуру со всеми доступными упражнениями для конкретного пользователя
@@ -42,7 +43,7 @@ def build_keyboard(
     buttons: List[InlineKeyboardButton] = []
     for button in response:
         buttons.append(
-            InlineKeyboardButton(button, callback_data=f"{button};step1"),
+            InlineKeyboardButton(button, callback_data=f"{button};{action}"),
         )
 
     keyboard = [buttons[i : i + n_cols] for i in range(0, len(buttons), n_cols)]
@@ -103,21 +104,28 @@ async def create_exercise(update: Update, context: CallbackContext.DEFAULT_TYPE)
     try:
         params.update(
             {
-                "name": context.args[0],
+                "exercise_name": context.args[0],
                 "reps_per_day_target": context.args[1],
             }
         )
         response = requests.post(
             url="http://127.0.0.1:8000/create_exercise/", params=params
         ).json()
-        await context.bot.send_message(chat_id=update.effective_chat.id, text=f"{response}")
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=f"{response}",
+            parse_mode="MarkdownV2",
+        )
     except IndexError:
         error_message = (
-        f'Не удалось создать упражнение.\nПравильная команда:\n\n<b>/create_exercise название_упражнения количество_повторений_в_день</b>'
-        f'\nНапример:\n\n<b>/create_exercise приседания 10</b>'
+            f"Не удалось создать упражнение.\nПравильная команда:\n\n<b>/create_exercise название_упражнения количество_повторений_в_день</b>"
+            f"\nНапример:\n\n<b>/create_exercise приседания 10</b>"
         )
-        await context.bot.send_message(chat_id=update.effective_chat.id, text=f"{error_message}", parse_mode="html",)
-
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=f"{error_message}",
+            parse_mode="html",
+        )
 
 
 async def update_exercise(update: Update, context: CallbackContext.DEFAULT_TYPE):
@@ -129,9 +137,29 @@ async def update_exercise(update: Update, context: CallbackContext.DEFAULT_TYPE)
     params.update(
         {"get_list": True}
     )  # Чтобы получить список упражнений, вместо словаря
-    reply_markup = InlineKeyboardMarkup(build_keyboard(n_cols=2, params=params))
+    reply_markup = InlineKeyboardMarkup(
+        build_keyboard(n_cols=2, params=params, action="update")
+    )
     await update.message.reply_text(
         text="Какое упражнение нужно обновить?", reply_markup=reply_markup
+    )
+    return CHOOSE_EXERCISE
+
+
+async def remove_exercise(update: Update, context: CallbackContext.DEFAULT_TYPE):
+    """
+    Отправить запрос на удаление упражнения
+    Запускает ConversationHandler
+    """
+    params = get_user_data(update)
+    params.update(
+        {"get_list": True}
+    )  # Чтобы получить список упражнений, вместо словаря
+    reply_markup = InlineKeyboardMarkup(
+        build_keyboard(n_cols=2, params=params, action="remove")
+    )
+    await update.message.reply_text(
+        text="Какое упражнение нужно удалить?", reply_markup=reply_markup
     )
     return CHOOSE_EXERCISE
 
@@ -144,17 +172,48 @@ async def select_exercise(update: Update, context: CallbackContext.DEFAULT_TYPE)
     await query.answer()
 
     data = query.data
-    logger.info(f"data, {data}")
     exercise_name = data.split(";")[0]
-    step_number = data.split(";")[1].strip()
+    action = data.split(";")[1].strip()
 
     context.user_data["exercise_name"] = exercise_name  # Сохраняем название упражнения
 
-    if step_number == "step1":
+    if action == "update":
         await query.edit_message_text(
             text=f"Сколько (число)?",
         )
-    return SET_VALUE
+        return SET_VALUE
+    elif action == "remove":
+        buttons = [
+            [
+                InlineKeyboardButton("Да", callback_data=f"yes;remove"),
+                InlineKeyboardButton("Нет", callback_data=f"no;remove"),
+            ]
+        ]
+        await query.edit_message_text(
+            text=f"Вы уверены, что хотите удалить упражнение {exercise_name}?",
+            reply_markup=InlineKeyboardMarkup(buttons),
+        )
+        return CONFIRM_ACTION
+
+
+async def confirm_action(update: Update, context: CallbackContext.DEFAULT_TYPE):
+    """
+    Обработка нажатий клавиатуры Да/Нет
+    """
+    query = update.callback_query
+    await query.answer()
+
+    data = query.data
+    confirm = data.split(";")[0].strip()
+    action = data.split(";")[1].strip()
+
+    if confirm == "yes" and action == "remove":
+        params = get_user_data(update)
+        params.update({"exercise_name": context.user_data["exercise_name"]})
+        response = requests.post(
+            url="http://127.0.0.1:8000/delete_exercise", params=params
+        ).json()
+        await query.edit_message_text(text=f"{response}")
 
 
 async def set_exercise_value(update: Update, context: CallbackContext.DEFAULT_TYPE):
@@ -223,10 +282,14 @@ if __name__ == "__main__":
     get_all_exercises_handler = CommandHandler("get_all_exercises", get_all_exercises)
 
     conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("update_exercise", update_exercise)],
+        entry_points=[
+            CommandHandler("update_exercise", update_exercise),
+            CommandHandler("remove_exercise", remove_exercise),
+        ],
         states={
             CHOOSE_EXERCISE: [CallbackQueryHandler(select_exercise)],
             SET_VALUE: [MessageHandler(filters.TEXT, set_exercise_value)],
+            CONFIRM_ACTION: [CallbackQueryHandler(confirm_action)],
         },
         fallbacks=[CommandHandler("end", end)],
     )

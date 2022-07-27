@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import List
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from . import models, schemas, utils
 
@@ -8,20 +9,25 @@ def create_exercise(db: Session, exercise: schemas.ExerciseBase, telegram_id: in
     """
     Создать новое упражнение
     """
-    user = utils.get_user_by_telegram_id(db, telegram_id=telegram_id)
-    new_exercise = models.Exercise(
-        created_date=datetime.now(),
-        name=exercise.name,
-        reps_per_day_target=exercise.reps_per_day_target,
-        user_id=user.id if user else None,
-    )
-    db.add(new_exercise)
-    db.commit()
-    db.refresh(new_exercise)
+    try:
+        user = utils.get_user_by_telegram_id(db, telegram_id=telegram_id)
+        new_exercise = models.Exercise(
+            created_date=datetime.now(),
+            name=exercise.name,
+            reps_per_day_target=exercise.reps_per_day_target,
+            user_id=user.id if user else None,
+        )
+        db.add(new_exercise)
+        db.commit()
+        db.refresh(new_exercise)
+    except IntegrityError:
+        return f"Упражнение *{exercise.name.title()}* уже существует"
     return new_exercise
 
 
-def update_exercise(db: Session, exercise: schemas.Exercise, reps_last_try: int):
+def update_exercise(
+    db: Session, exercise: schemas.Exercise, reps_last_try: int, active: bool = True
+):
     """
     Обновить данные об упражнении
     """
@@ -30,6 +36,7 @@ def update_exercise(db: Session, exercise: schemas.Exercise, reps_last_try: int)
             "last_updated_date": datetime.now(),
             "reps_last_try": reps_last_try,
             "reps_per_day_done": exercise.reps_per_day_done + reps_last_try,
+            "active": active,
         }
     )
     db.commit()
@@ -37,8 +44,22 @@ def update_exercise(db: Session, exercise: schemas.Exercise, reps_last_try: int)
     return exercise
 
 
+def delete_exercise(db: Session, exercise_id: int):
+    """
+    Удалить упражнение
+    """
+    db.query(models.Exercise).filter(models.Exercise.id == exercise_id).update(
+        {
+            "last_updated_date": datetime.now(),
+            "active": False,
+        }
+    )
+    db.commit()
+    return True
+
+
 def get_exercise_by_name(
-    db: Session, name: str, telegram_user_id: int
+    db: Session, name: str, telegram_user_id: int, active: bool = True
 ) -> models.Exercise:
     """
     Получить объекет упражнения по имени
@@ -46,16 +67,22 @@ def get_exercise_by_name(
     user = utils.get_user_by_telegram_id(db, telegram_id=telegram_user_id)
     return (
         db.query(models.Exercise)
-        .filter(models.Exercise.name == name, models.Exercise.user_id == user.id)
+        .filter(
+            models.Exercise.name == name,
+            models.Exercise.user_id == user.id,
+            models.Exercise.active == active,
+        )
         .first()
     )
 
 
-def get_all_exercises(db: Session, user_id: int) -> list:
+def get_all_exercises(db: Session, user_id: int, active: bool = True) -> list:
     """
     Получить список всех упражнений пользователя
     """
     user = utils.get_user_by_telegram_id(db, user_id)
+    if active:
+        return user.active_exercises
     return user.exerecises
 
 
