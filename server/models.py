@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Float
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Float, Boolean
 from sqlalchemy.orm import relationship
 
 from .database import Base
@@ -25,6 +25,10 @@ class User(Base):
             exercise.name: exercise.reps_per_day_target for exercise in self.exerecises
         }
 
+    @property
+    def active_exercises(self):
+        return [exercise for exercise in self.exerecises if exercise.active]
+
 
 class Message(Base):
     __tablename__ = "messages"
@@ -48,6 +52,7 @@ class Exercise(Base):
     __tablename__ = "excercises"
 
     id = Column(Integer, primary_key=True, index=True)
+    active = Column(Boolean, index=True, default=True)
     created_date = Column(DateTime, index=True)
     last_updated_date = Column(DateTime)
 

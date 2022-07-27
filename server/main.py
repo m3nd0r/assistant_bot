@@ -103,38 +103,55 @@ async def get_all_exercises(
 @app.post("/create_exercise")
 async def create_exercise(
     user_id: int,
-    name: str,
+    exercise_name: str,
     reps_per_day_target: int,
     db: Session = Depends(get_db),
 ):
     """
     Создаёт новое упражнение и сохраняет в БД название и количество повторений
     """
-    training.create_exercise(
-        db,
-        exercise=schemas.ExerciseBase(
-            name=name, reps_per_day_target=reps_per_day_target
-        ),
-        telegram_id=user_id,
-    )
-    return f"Установил название упражнения: '{name.title()}' и количество повторений в день - {reps_per_day_target}"
-
+    exercise = training.get_exercise_by_name(db, exercise_name, user_id, active=False)
+    if not exercise:
+        return training.create_exercise(
+            db,
+            exercise=schemas.ExerciseBase(
+                name=exercise_name, reps_per_day_target=reps_per_day_target
+            ),
+            telegram_id=user_id,
+        )
+    else:
+        training.update_exercise(db, exercise, 0)
+    return f"Установил название упражнения: '{exercise_name.title()}' и количество повторений в день - {reps_per_day_target}"
 
 
 @app.post("/update_exercise")
 async def update_exercise(
     user_id: int,
-    name: str,
+    exercise_name: str,
     reps_last_try: int = 0,
     db: Session = Depends(get_db),
 ):
     """
     Обновляет название и количество повторений упражнения по названию
     """
-    exercise = training.get_exercise_by_name(db, name, user_id)
+    exercise = training.get_exercise_by_name(db, exercise_name, user_id)
     updated_exercise = training.update_exercise(
         db,
         exercise=exercise,
         reps_last_try=reps_last_try,
     )
     return updated_exercise.prepare_update_exercise_message
+
+
+@app.post("/delete_exercise")
+async def delete_exercise(
+    user_id: int,
+    exercise_name: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Удаляет упражнение по названию
+    """
+    exercise = training.get_exercise_by_name(db, exercise_name, user_id)
+    training.delete_exercise(db, exercise.id)
+    return f"Удалил упражнение '{exercise.name.title()}'"
