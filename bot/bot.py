@@ -114,7 +114,6 @@ async def create_exercise(update: Update, context: CallbackContext.DEFAULT_TYPE)
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text=f"{response}",
-            parse_mode="MarkdownV2",
         )
     except IndexError:
         error_message = (
@@ -226,7 +225,7 @@ async def set_exercise_value(update: Update, context: CallbackContext.DEFAULT_TY
         value = int(update.effective_message.text)
         params.update(
             {
-                "name": exercise_name,
+                "exercise_name": exercise_name,
                 "reps_last_try": value,
             }
         )
