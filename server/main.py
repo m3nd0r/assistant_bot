@@ -112,7 +112,7 @@ async def create_exercise(
     """
     exercise = training.get_exercise_by_name(db, exercise_name, user_id, active=False)
     if not exercise:
-        return training.create_exercise(
+        training.create_exercise(
             db,
             exercise=schemas.ExerciseBase(
                 name=exercise_name, reps_per_day_target=reps_per_day_target

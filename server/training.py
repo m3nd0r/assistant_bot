@@ -31,9 +31,18 @@ def update_exercise(
     """
     Обновить данные об упражнении
     """
+    current_time = datetime.now()
+    db.add(
+        models.UserExercise(
+            user_id=exercise.user_id,
+            exercise_id=exercise.id,
+            reps=reps_last_try,
+            datetime=current_time,
+        )
+    )
     db.query(models.Exercise).filter(models.Exercise.id == exercise.id).update(
         {
-            "last_updated_date": datetime.now(),
+            "last_updated_date": current_time,
             "reps_last_try": reps_last_try,
             "reps_per_day_done": exercise.reps_per_day_done + reps_last_try,
             "active": active,
