@@ -98,7 +98,7 @@ def message_all_exerises(exercises_list: List[models.Exercise]) -> str:
     Собрать сообщение со списком упражнений
     """
     exercises_names = [
-        f"*{exercise.name.title()}*: {exercise.reps_per_day_target}\n"
+        f"<b>{exercise.name.title()}</b>:\nОсталось: <b>{exercise.reps_per_day_left}</b>\nСделано: <b>{exercise.reps_per_day_done}</b>\nЦель: <b>{exercise.reps_per_day_target}</b>\n\n"
         for exercise in exercises_list
     ]
     return "".join(exercises_names)
