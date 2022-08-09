@@ -266,7 +266,7 @@ async def get_all_exercises(update: Update, context: CallbackContext.DEFAULT_TYP
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
         text=f"{response}",
-        parse_mode="MarkdownV2",
+        parse_mode="html",
     )
 
 
