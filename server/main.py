@@ -110,7 +110,7 @@ async def create_exercise(
     """
     Создаёт новое упражнение и сохраняет в БД название и количество повторений
     """
-    exercise = training.get_exercise_by_name(db, exercise_name, user_id, active=False)
+    exercise = training.get_exercise_by_name(db, exercise_name, user_id)
     if not exercise:
         training.create_exercise(
             db,
@@ -120,7 +120,7 @@ async def create_exercise(
             telegram_id=user_id,
         )
     else:
-        training.update_exercise(db, exercise, 0)
+        return f"Упражнение <b>{exercise.name.title()}</b> уже существует"
     return f"Установил название упражнения: '{exercise_name.title()}' и количество повторений в день - {reps_per_day_target}"
 
 

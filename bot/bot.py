@@ -112,8 +112,7 @@ async def create_exercise(update: Update, context: CallbackContext.DEFAULT_TYPE)
             url="http://127.0.0.1:8000/create_exercise/", params=params
         ).json()
         await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text=f"{response}",
+            chat_id=update.effective_chat.id, text=f"{response}", parse_mode="html"
         )
     except IndexError:
         error_message = (

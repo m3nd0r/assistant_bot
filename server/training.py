@@ -9,19 +9,17 @@ def create_exercise(db: Session, exercise: schemas.ExerciseBase, telegram_id: in
     """
     Создать новое упражнение
     """
-    try:
-        user = utils.get_user_by_telegram_id(db, telegram_id=telegram_id)
-        new_exercise = models.Exercise(
-            created_date=datetime.now(),
-            name=exercise.name,
-            reps_per_day_target=exercise.reps_per_day_target,
-            user_id=user.id if user else None,
-        )
-        db.add(new_exercise)
-        db.commit()
-        db.refresh(new_exercise)
-    except IntegrityError:
-        return f"Упражнение *{exercise.name.title()}* уже существует"
+    user = utils.get_user_by_telegram_id(db, telegram_id=telegram_id)
+    new_exercise = models.Exercise(
+        created_date=datetime.now(),
+        name=exercise.name,
+        reps_per_day_target=exercise.reps_per_day_target,
+        user_id=user.id if user else None,
+    )
+    db.add(new_exercise)
+    db.commit()
+    db.refresh(new_exercise)
+
     return new_exercise
 
 
