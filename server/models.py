@@ -1,3 +1,4 @@
+from datetime import datetime
 from sqlalchemy import (
     Column,
     DateTime,
@@ -77,9 +78,16 @@ class Exercise(Base):
     @property
     def reps_per_day_left(self):
         """
-        Оставшееся количество повторений в день
+        Оставшееся количество повторений в день.
+        Если сегодня ничего не делалось - возвращает количество повторений в день.
         """
-        return self.reps_per_day_target - self.reps_per_day_done
+        if (
+            self.last_updated_date
+            and self.last_updated_date.date() == datetime.now().date()
+        ):
+            return self.reps_per_day_target - self.reps_per_day_done
+        else:
+            return self.reps_per_day_target
 
     @property
     def prepare_update_exercise_message(self):
