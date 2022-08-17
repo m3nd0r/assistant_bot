@@ -136,7 +136,7 @@ async def select_exercise(update: Update, context: CallbackContext.DEFAULT_TYPE)
             [
                 InlineKeyboardButton("Да", callback_data=f"yes;remove"),
                 InlineKeyboardButton("Нет", callback_data=f"no;remove"),
-                [InlineKeyboardButton("Отмена", callback_data=";cancel")],
+                InlineKeyboardButton("Отмена", callback_data=";cancel"),
             ]
         ]
         await query.edit_message_text(
