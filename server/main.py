@@ -104,7 +104,7 @@ async def get_all_exercises(
 async def create_exercise(
     user_id: int,
     exercise_name: str,
-    reps_per_day_target: int,
+    reps: int,
     db: Session = Depends(get_db),
 ):
     """
@@ -114,21 +114,21 @@ async def create_exercise(
     if not exercise:
         training.create_exercise(
             db,
-            exercise=schemas.ExerciseBase(
-                name=exercise_name, reps_per_day_target=reps_per_day_target
-            ),
+            exercise=schemas.ExerciseBase(name=exercise_name, reps_per_day_target=reps),
             telegram_id=user_id,
         )
     else:
-        return f"Упражнение <b>{exercise.name.title()}</b> уже существует"
-    return f"Установил название упражнения: '{exercise_name.title()}' и количество повторений в день - {reps_per_day_target}"
+        return {"message": f"Упражнение <b>{exercise.name.title()}</b> уже существует"}
+    return {
+        "message": f"Готово!\nУстановил название упражнения: <b>'{exercise_name.title()}'</b> и количество повторений в день - <b>{reps}</b>"
+    }
 
 
 @app.post("/update_exercise")
 async def update_exercise(
     user_id: int,
     exercise_name: str,
-    reps_last_try: int = 0,
+    reps: int = 0,
     db: Session = Depends(get_db),
 ):
     """
@@ -138,7 +138,7 @@ async def update_exercise(
     updated_exercise = training.update_exercise(
         db,
         exercise=exercise,
-        reps_last_try=reps_last_try,
+        reps_last_try=reps,
     )
     return updated_exercise.prepare_update_exercise_message
 

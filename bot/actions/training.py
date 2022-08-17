@@ -4,7 +4,7 @@ import requests
 from telegram import InlineKeyboardButton, Update, InlineKeyboardMarkup
 from telegram.ext import CallbackContext, ConversationHandler
 
-CHOOSE_EXERCISE, SET_VALUE, CONFIRM_ACTION = range(3)
+ADD_EXERCISE, CHOOSE_EXERCISE, SET_VALUE, CONFIRM_ACTION = range(4)
 
 
 def build_keyboard(
@@ -25,6 +25,7 @@ def build_keyboard(
         buttons.append(
             InlineKeyboardButton(button, callback_data=f"{button};{action}"),
         )
+    footer_buttons = [InlineKeyboardButton("Отмена", callback_data=";cancel")]
 
     keyboard = [buttons[i : i + n_cols] for i in range(0, len(buttons), n_cols)]
     if header_buttons:
@@ -57,30 +58,23 @@ async def create_exercise(update: Update, context: CallbackContext.DEFAULT_TYPE)
     """
     Добавить новое упражнение
     """
-    params = get_user_data(update)
-    try:
-        params.update(
-            {
-                "exercise_name": context.args[0],
-                "reps_per_day_target": context.args[1],
-            }
-        )
-        response = requests.post(
-            url="http://127.0.0.1:8000/create_exercise/", params=params
-        ).json()
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id, text=f"{response}", parse_mode="html"
-        )
-    except IndexError:
-        error_message = (
-            f"Не удалось создать упражнение.\nПравильная команда:\n\n<b>/create_exercise название_упражнения количество_повторений_в_день</b>"
-            f"\nНапример:\n\n<b>/create_exercise приседания 10</b>"
-        )
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text=f"{error_message}",
-            parse_mode="html",
-        )
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text="Введите название упражнения:",
+    )
+    return ADD_EXERCISE
+
+
+async def add_exercise(update: Update, context: CallbackContext.DEFAULT_TYPE):
+    """
+    Добавить новое упражнение
+    """
+    context.user_data["exercise_name"] = update.effective_message.text
+    context.user_data["create"] = True
+    await update.message.reply_text(
+        text="Введите количество повторений в день:", parse_mode="html"
+    )
+    return SET_VALUE
 
 
 async def update_exercise(update: Update, context: CallbackContext.DEFAULT_TYPE):
@@ -142,6 +136,7 @@ async def select_exercise(update: Update, context: CallbackContext.DEFAULT_TYPE)
             [
                 InlineKeyboardButton("Да", callback_data=f"yes;remove"),
                 InlineKeyboardButton("Нет", callback_data=f"no;remove"),
+                [InlineKeyboardButton("Отмена", callback_data=";cancel")],
             ]
         ]
         await query.edit_message_text(
@@ -149,6 +144,11 @@ async def select_exercise(update: Update, context: CallbackContext.DEFAULT_TYPE)
             reply_markup=InlineKeyboardMarkup(buttons),
         )
         return CONFIRM_ACTION
+    elif action == "cancel":
+        await query.edit_message_text(
+            text=f"Отменено",
+        )
+        return ConversationHandler.END
 
 
 async def confirm_action(update: Update, context: CallbackContext.DEFAULT_TYPE):
@@ -162,13 +162,33 @@ async def confirm_action(update: Update, context: CallbackContext.DEFAULT_TYPE):
     confirm = data.split(";")[0].strip()
     action = data.split(";")[1].strip()
 
-    if confirm == "yes" and action == "remove":
-        params = get_user_data(update)
-        params.update({"exercise_name": context.user_data["exercise_name"]})
-        response = requests.post(
-            url="http://127.0.0.1:8000/delete_exercise", params=params
-        ).json()
-        await query.edit_message_text(text=f"{response}")
+    if confirm == "yes":
+        if action == "remove":
+            params = get_user_data(update)
+            params.update({"exercise_name": context.user_data["exercise_name"]})
+            response = requests.post(
+                url="http://127.0.0.1:8000/delete_exercise", params=params
+            ).json()
+            await query.edit_message_text(text=f"{response}")
+            return ConversationHandler.END
+        if action == "create":
+            params = context.user_data.get("params")
+            response = requests.post(
+                url="http://127.0.0.1:8000/create_exercise", params=params
+            ).json()
+            await query.edit_message_text(
+                text=f"{response.get('message')}",
+                parse_mode="html",
+            )
+            return ConversationHandler.END
+    elif confirm == "no":
+        if action == "create":
+            pass
+    elif action == "cancel":
+        await query.edit_message_text(
+            text=f"Отменено",
+        )
+        return ConversationHandler.END
 
 
 async def set_exercise_value(update: Update, context: CallbackContext.DEFAULT_TYPE):
@@ -182,17 +202,35 @@ async def set_exercise_value(update: Update, context: CallbackContext.DEFAULT_TY
         params.update(
             {
                 "exercise_name": exercise_name,
-                "reps_last_try": value,
+                "reps": value,
             }
         )
-        response = requests.post(
-            url="http://127.0.0.1:8000/update_exercise", params=params
-        ).json()
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text=response.get("message"),
-            parse_mode="MarkdownV2",
-        )
+        context.user_data["params"] = params
+        if context.user_data.get("create"):
+            buttons = [
+                [
+                    InlineKeyboardButton("Да", callback_data=f"yes;create"),
+                    InlineKeyboardButton("Нет", callback_data=f"no;create"),
+                    InlineKeyboardButton("Отмена", callback_data=";cancel"),
+                ]
+            ]
+            message = f"Добавить новое упражнение: '{exercise_name.title()}' и количество повторений в день - {value}\n\nВсё верно?"
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=message,
+                parse_mode="html",
+                reply_markup=InlineKeyboardMarkup(buttons),
+            )
+            return CONFIRM_ACTION
+        else:
+            response = requests.post(
+                url="http://127.0.0.1:8000/update_exercise", params=params
+            ).json()
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=response.get("message"),
+                parse_mode="html",
+            )
     except ValueError as e:
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
