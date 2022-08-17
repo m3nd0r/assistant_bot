@@ -96,18 +96,18 @@ class Exercise(Base):
         """
         data = {
             "reps_per_day_left": self.reps_per_day_left,
-            "message": f"Обновил *{self.name}* на *{self.reps_last_try}*\nОсталось сегодня: *{self.reps_per_day_left}*",
+            "message": f"Обновил <b>{self.name}</b> на <b>{self.reps_last_try}</b>\nОсталось сегодня: <b>{self.reps_per_day_left}</b>",
         }
         if self.reps_per_day_left < 0:
             data.update(
                 {
-                    "message": f'Обновил *"{self.name.title()}"* на *{self.reps_last_try}*\nОстановись\! Уже перевыполнил план на *{abs(self.reps_per_day_left)}*\!\nКрасава\!💪🏻'
+                    "message": f'Обновил <b>>"{self.name.title()}"</b> на <b>{self.reps_last_try}</b>\nОстановись\! Уже перевыполнил план на <b>{abs(self.reps_per_day_left)}</b>\!\nКрасава\!💪🏻'
                 }
             )
         elif self.reps_per_day_left == 0:
             data.update(
                 {
-                    "message": f'Обновил *"{self.name.title()}"* на *{self.reps_last_try}*\nС этим упражнением - всё\!💪🏻',
+                    "message": f'Обновил <b>"{self.name.title()}"</b> на <b>{self.reps_last_try}</b>\nС этим упражнением - всё\!💪🏻',
                 }
             )
         return data

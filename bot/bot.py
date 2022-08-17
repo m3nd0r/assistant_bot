@@ -24,6 +24,8 @@ from actions.training import (
     set_exercise_value,
     end,
     get_all_exercises,
+    add_exercise,
+    ADD_EXERCISE,
     CHOOSE_EXERCISE,
     SET_VALUE,
     CONFIRM_ACTION,
@@ -68,15 +70,16 @@ if __name__ == "__main__":
     start_handler = CommandHandler("start", start)
     currency_handler = CommandHandler("currency", currency)
     need_tl_handler = CommandHandler("need_tl", need_tl)
-    create_exercise_handler = CommandHandler("create_exercise", create_exercise)
     get_all_exercises_handler = CommandHandler("get_all_exercises", get_all_exercises)
 
     conv_handler = ConversationHandler(
         entry_points=[
             CommandHandler("update_exercise", update_exercise),
             CommandHandler("remove_exercise", remove_exercise),
+            CommandHandler("create_exercise", create_exercise),
         ],
         states={
+            ADD_EXERCISE: [MessageHandler(filters.TEXT, add_exercise)],
             CHOOSE_EXERCISE: [CallbackQueryHandler(select_exercise)],
             SET_VALUE: [MessageHandler(filters.TEXT, set_exercise_value)],
             CONFIRM_ACTION: [CallbackQueryHandler(confirm_action)],
@@ -88,7 +91,6 @@ if __name__ == "__main__":
             start_handler,
             currency_handler,
             need_tl_handler,
-            create_exercise_handler,
             get_all_exercises_handler,
             conv_handler,
         ]
